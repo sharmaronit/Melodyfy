@@ -519,6 +519,17 @@ def list_projects(db: Session = Depends(get_db)):
     return [_repo_summary(r) for r in repos]
 
 
+@app.get("/projects/mine")
+def my_projects(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return all repositories owned by the authenticated user (public + private)."""
+    repos = db.query(Repository).filter(Repository.owner_id == current_user.id)\
+               .order_by(Repository.updated_at.desc()).all()
+    return [_repo_summary(r) for r in repos]
+
+
 @app.get("/projects/search")
 def search_projects(
     q:       Optional[str]   = Query(None, description="Text search in name/description"),

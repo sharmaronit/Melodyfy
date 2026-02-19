@@ -237,13 +237,79 @@ async function loadMe(){
   }catch{}
 }
 
+/* ── My repos picker (no ?id= in URL) ───────────────────────── */
+async function loadMyRepos(){
+  const area=document.getElementById('repo-header-area');
+  const mainEl=document.querySelector('main');
+
+  // Hide tabs — not needed in picker mode
+  document.querySelector('.tabs').style.display='none';
+  document.querySelectorAll('.tab-content').forEach(el=>el.style.display='none');
+
+  if(!token){
+    area.innerHTML=`<div style="padding:48px 0;text-align:center;">
+      <div style="font-size:32px;margin-bottom:12px;">🎵</div>
+      <h2 style="margin-bottom:8px;">Your Repositories</h2>
+      <p style="color:var(--text-muted);margin-bottom:20px;">Sign in to view your projects.</p>
+      <a href="index.html" class="btn btn-green">Sign In</a>
+    </div>`;
+    return;
+  }
+
+  area.innerHTML=`<div style="padding:24px 0 8px;">
+    <h2 style="font-size:20px;margin-bottom:4px;">Your Repositories</h2>
+    <p style="color:var(--text-muted);font-size:13px;">Select a project to open its repository.</p>
+  </div>`;
+
+  // Create a container for the project cards
+  const listWrap=document.createElement('div');
+  listWrap.id='my-repos-list';
+  listWrap.style.cssText='display:flex;flex-direction:column;gap:12px;margin-top:16px;';
+  listWrap.innerHTML='<div class="loading-pulse" style="padding:20px;color:var(--text-muted);">Loading your projects…</div>';
+  mainEl.appendChild(listWrap);
+
+  try{
+    const r=await fetch(`${API}/projects/mine`,{headers});
+    if(!r.ok) throw new Error(r.status);
+    const projects=await r.json();
+
+    if(!projects.length){
+      listWrap.innerHTML=`<div style="padding:40px;text-align:center;color:var(--text-muted);">
+        <div style="font-size:28px;margin-bottom:12px;">📂</div>
+        <p>No projects yet. Generate a beat in Studio to create your first one!</p>
+        <a href="studio.html" class="btn btn-green" style="margin-top:16px;display:inline-block;">Open Studio</a>
+      </div>`;
+      return;
+    }
+
+    listWrap.innerHTML=projects.map(p=>`
+      <div class="glass fade-in" style="padding:16px 20px;cursor:pointer;transition:background .15s;" onclick="location.href='repo.html?id=${p.id}'" onmouseover="this.style.background='rgba(237,232,223,.06)'" onmouseout="this.style.background=''">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:15px;font-weight:600;color:var(--accent);margin-bottom:3px;">${p.name||'Untitled'}</div>
+            <div style="font-size:12px;color:var(--text-muted);">${p.description||p.genre||''} ${p.bpm?'· '+p.bpm+' BPM':''} ${p.key?'· '+p.key:''}</div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text-muted);flex-shrink:0;">
+            ${p.visibility==='public'?'<span class="tag tag-vis">Public</span>':'<span class="tag tag-private">Private</span>'}
+            <span>${p.commit_count||0} commit${p.commit_count!==1?'s':''}</span>
+            <span style="color:var(--orange);">→</span>
+          </div>
+        </div>
+      </div>`).join('');
+    setTimeout(()=>listWrap.querySelectorAll('.fade-in').forEach((el,i)=>setTimeout(()=>el.classList.add('visible'),i*40)),50);
+  }catch(e){
+    listWrap.innerHTML=`<div style="padding:20px;color:var(--red);">Failed to load projects: ${e.message}</div>`;
+  }
+}
+
 /* ── Main load ───────────────────────────────────────────────── */
 async function loadRepo(){
   const params=new URLSearchParams(location.search);
   _repoId=params.get('id');
   if(!_repoId){
-  document.getElementById('repo-header-area').innerHTML='<p style="color:var(--red);padding:40px;">No repository ID in URL. Use ?id=<repo_id></p>';
-  return;
+    await loadMe();
+    loadMyRepos();
+    return;
   }
   try{
   const r=await fetch(`${API}/projects/${_repoId}`,{headers});
