@@ -589,25 +589,38 @@ function resetTools(){
 
 /* ── Load user repos for selector ────────────────────────────── */
 async function loadRepos(){
-  try{
-  const r=await fetch(`${API}/projects`,{headers:{...headers,'Content-Type':'application/json'}});
-  const d=await r.json();
-  const repos=d.repositories||d||[];
   const sel=document.getElementById('repo-select');
-  repos.forEach(repo=>{
-  const o=document.createElement('option');
-  o.value=repo.id; o.textContent=repo.name;
-  sel.appendChild(o);
-  });
-  // Check URL for repo_id
-  const params=new URLSearchParams(location.search);
-  if(params.get('repo_id')) sel.value=params.get('repo_id');
-  // Pre-fill commit message for rollback/branch
-  if(params.get('parent_hash')){
-  const msg=document.getElementById('commit-msg');
-  if(msg&&!msg.value) msg.value=`Rollback to ${params.get('parent_hash')}`;
+  if(!token){
+    sel.innerHTML='<option value="">Sign in to see your projects…</option>';
+    return;
   }
-  }catch(e){console.error(e);}
+  try{
+    // Use /projects/mine so the user sees THEIR own repos (incl. private)
+    const r=await fetch(`${API}/projects/mine`,{headers:{...headers,'Content-Type':'application/json'}});
+    if(!r.ok) throw new Error(r.status);
+    const repos=await r.json();
+    sel.innerHTML='<option value="">Select a project…</option>';
+    if(!repos.length){
+      sel.innerHTML='<option value="">No projects yet — create one in Repository</option>';
+      return;
+    }
+    repos.forEach(repo=>{
+      const o=document.createElement('option');
+      o.value=repo.id; o.textContent=repo.name;
+      sel.appendChild(o);
+    });
+    // Check URL for repo_id
+    const params=new URLSearchParams(location.search);
+    if(params.get('repo_id')) sel.value=params.get('repo_id');
+    // Pre-fill commit message for rollback/branch
+    if(params.get('parent_hash')){
+      const msg=document.getElementById('commit-msg');
+      if(msg&&!msg.value) msg.value=`Rollback to ${params.get('parent_hash')}`;
+    }
+  }catch(e){
+    console.error('loadRepos:',e);
+    sel.innerHTML='<option value="">Failed to load projects</option>';
+  }
 }
 loadRepos();
 
@@ -1934,7 +1947,13 @@ async function masterAudio(){
 
 /* ── Save to Project (commit) ─────────────────────────────────── */
 async function saveToProject(){
-  if(!_currentFilename){ showStatus('save-status','Generate a beat first!','err'); return; }
+  if(!token){ showStatus('save-status','Sign in to commit to a project.','err'); return; }
+  // Fall back to session-beat-select if no freshly-generated beat
+  if(!_currentFilename){
+    const sel=document.getElementById('session-beat-select');
+    if(sel&&sel.value){ _currentFilename=sel.value; }
+  }
+  if(!_currentFilename){ showStatus('save-status','Generate or select a beat first!','err'); return; }
   const repoId=document.getElementById('repo-select').value;
   if(!repoId){ showStatus('save-status','Select a project first!','err'); return; }
   const msg=document.getElementById('commit-msg').value||'New beat';
