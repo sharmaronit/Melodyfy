@@ -11,6 +11,25 @@
 body{background:var(--bg-canvas);color:var(--text-primary);font-family:'Space Grotesk',sans-serif;line-height:1.5;}
 h1,h2,h3{font-family:'Archivo Black',sans-serif;color:var(--accent);}
 
+/* ── Create Repo Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px;}
+.modal-box{background:var(--bg-overlay);border:1px solid var(--border);border-radius:14px;padding:28px 28px 24px;width:100%;max-width:460px;display:flex;flex-direction:column;gap:16px;}
+.modal-box h3{font-size:17px;font-weight:700;color:var(--accent);margin-bottom:2px;}
+.modal-field{display:flex;flex-direction:column;gap:6px;}
+.modal-field label{font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;}
+.modal-field input,.modal-field textarea{background:var(--bg-inset);border:1px solid var(--border);border-radius:8px;padding:9px 12px;color:var(--text-primary);font-family:inherit;font-size:13px;outline:none;transition:border .15s;resize:none;}
+.modal-field input:focus,.modal-field textarea:focus{border-color:var(--orange);}
+.modal-vis-row{display:flex;gap:10px;}
+.vis-opt{flex:1;display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all .12s;font-size:13px;}
+.vis-opt:hover{border-color:var(--text-muted);}
+.vis-opt.selected{border-color:var(--orange);background:rgba(240,136,62,.1);color:var(--accent);}
+.vis-opt input{width:14px;height:14px;accent-color:var(--orange);}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:4px;}
+.btn-cancel{padding:8px 18px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:13px;cursor:pointer;transition:all .12s;}
+.btn-cancel:hover{color:var(--text-primary);border-color:var(--text-muted);}
+.create-new-btn{display:flex;align-items:center;gap:7px;padding:9px 18px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;}
+.create-new-btn:hover{border-color:var(--orange);color:var(--orange);}
+
 /* ── NAV ── */
 .btn-star{background:rgba(227,179,65,.12);border-color:rgba(227,179,65,.3);color:var(--yellow);}
 .btn-star:hover{background:rgba(227,179,65,.22);}
@@ -256,9 +275,15 @@ async function loadMyRepos(){
     return;
   }
 
-  area.innerHTML=`<div style="padding:24px 0 8px;">
-    <h2 style="font-size:20px;margin-bottom:4px;">Your Repositories</h2>
-    <p style="color:var(--text-muted);font-size:13px;">Select a project to open its repository.</p>
+  area.innerHTML=`<div style="padding:24px 0 8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div style="flex:1;">
+      <h2 style="font-size:20px;margin-bottom:4px;">Your Repositories</h2>
+      <p style="color:var(--text-muted);font-size:13px;">Select a project to open its repository.</p>
+    </div>
+    <button class="create-new-btn" onclick="openCreateModal()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      New Repository
+    </button>
   </div>`;
 
   // Create a container for the project cards
@@ -587,6 +612,85 @@ function escHtml(s){
 }
 
 /* ── Boot ────────────────────────────────────────────────────── */
+/* Inject create-repo modal DOM once */
+(function(){
+  const m=document.createElement('div');
+  m.id='create-repo-modal';
+  m.className='modal-overlay';
+  m.style.display='none';
+  m.innerHTML=`
+  <div class="modal-box">
+    <h3>New Repository</h3>
+    <div class="modal-field">
+      <label>Name</label>
+      <input id="cr-name" type="text" placeholder="My Awesome Project" maxlength="80" autocomplete="off"/>
+    </div>
+    <div class="modal-field">
+      <label>Description <span style="font-weight:400;opacity:.5;">(optional)</span></label>
+      <textarea id="cr-desc" rows="2" placeholder="What's this project about?"></textarea>
+    </div>
+    <div class="modal-field">
+      <label>Visibility</label>
+      <div class="modal-vis-row">
+        <label class="vis-opt selected" id="vis-public-opt">
+          <input type="radio" name="cr-vis" value="public" checked onchange="toggleVisOpt()"/>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>
+          Public
+        </label>
+        <label class="vis-opt" id="vis-private-opt">
+          <input type="radio" name="cr-vis" value="private" onchange="toggleVisOpt()"/>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Private
+        </label>
+      </div>
+    </div>
+    <div id="cr-status" class="status-line" style="display:none;"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeCreateModal()">Cancel</button>
+      <button class="btn btn-green" onclick="submitCreateRepo()">Create Repository</button>
+    </div>
+  </div>`;
+  document.body.appendChild(m);
+  m.addEventListener('click', e=>{ if(e.target===m) closeCreateModal(); });
+})();
+
+function openCreateModal(){
+  document.getElementById('cr-name').value='';
+  document.getElementById('cr-desc').value='';
+  document.querySelector('[name="cr-vis"][value="public"]').checked=true;
+  toggleVisOpt();
+  document.getElementById('cr-status').style.display='none';
+  document.getElementById('create-repo-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('cr-name').focus(),50);
+}
+function closeCreateModal(){ document.getElementById('create-repo-modal').style.display='none'; }
+function toggleVisOpt(){
+  const pub=document.querySelector('[name="cr-vis"][value="public"]').checked;
+  document.getElementById('vis-public-opt').classList.toggle('selected',pub);
+  document.getElementById('vis-private-opt').classList.toggle('selected',!pub);
+}
+async function submitCreateRepo(){
+  const name=document.getElementById('cr-name').value.trim();
+  if(!name){ showCrStatus('Name is required.','err'); return; }
+  const desc=document.getElementById('cr-desc').value.trim();
+  const isPublic=document.querySelector('[name="cr-vis"][value="public"]').checked;
+  showCrStatus('Creating…','info');
+  try{
+    const r=await fetch(`${API}/projects`,{
+      method:'POST', headers,
+      body:JSON.stringify({name, description:desc, is_public:isPublic})
+    });
+    if(!r.ok){ const e=await r.json(); throw new Error(e.detail||r.status); }
+    const d=await r.json();
+    closeCreateModal();
+    location.href=`repo.html?id=${d.id}`;
+  }catch(e){ showCrStatus('✗ '+e.message,'err'); }
+}
+function showCrStatus(msg,type){
+  const el=document.getElementById('cr-status');
+  el.className='status-line '+type; el.textContent=msg; el.style.display='block';
+}
+
 Promise.all([loadMe(), loadRepo()]);
 </script>
 <script src="nav.js"></script>
